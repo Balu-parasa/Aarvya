@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "linkedin-search",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["playwright", "install", "chromium"],
+      "port": 3000
+    }
+  ]
+}
