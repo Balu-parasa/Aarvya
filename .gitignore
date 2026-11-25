@@ -1,6 +1,37 @@
-﻿node_modules/
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Next.js build output
+.next/
+out/
+build/
+dist/
+
+# Python / Django
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+*.sqlite3-journal
+
+# Environment variables
 .env
-.env.*
-!.env.example
+.env*.local
+
+# Debug and Logs
 npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.log
+
+# OS & Editor
 .DS_Store
+Thumbs.db
+.vscode/
+.idea/
