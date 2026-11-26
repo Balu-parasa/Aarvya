@@ -8,7 +8,10 @@ import {
   User,
 } from '@/types';
 
-const DJANGO_API_BASE = (typeof process !== 'undefined' && process.env?.NEXT_PUBLIC_API_URL) || 'http://127.0.0.1:8000/api';
+const DJANGO_API_BASE =
+  (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_API_URL) ||
+  (typeof process !== 'undefined' && (process.env?.NEXT_PUBLIC_API_URL || process.env?.VITE_API_URL)) ||
+  'http://127.0.0.1:8000/api';
 
 class ApiClient {
   private baseUrl: string;
