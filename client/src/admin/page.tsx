@@ -124,7 +124,7 @@ export default function AdminPage() {
   ];
 
   return (
-    <AuthGuard>
+    <AuthGuard allowedRoles={['admin']}>
       <div className="flex min-h-screen bg-[#F8FAFC] text-[#142334] font-sans">
         {/* Left Sidebar */}
         <aside className="w-64 bg-white border-r border-[#DBE2EB] flex flex-col justify-between shrink-0 fixed inset-y-0 left-0 z-30 hidden lg:flex">

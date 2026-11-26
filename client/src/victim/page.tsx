@@ -616,7 +616,7 @@ export default function VictimPortal() {
       : 'text-rose-700 bg-rose-50 border-rose-200';
 
   return (
-    <AuthGuard>
+    <AuthGuard allowedRoles={['victim']}>
       <div className="flex flex-col min-h-screen bg-gradient-to-b from-[#EEF3F9]/70 via-[#F8FAFC] to-[#F8FAFC] text-[#142334] font-sans">
         <TopNavigation showSOS={true} role="Victim" />
 

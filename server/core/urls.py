@@ -5,6 +5,7 @@ urlpatterns = [
     # Auth
     path('auth/login/', views.api_login, name='api_login'),
     path('auth/register/', views.api_register, name='api_register'),
+    path('auth/google/', views.api_google_auth, name='api_google_auth'),
 
     # Cases & Alerts
     path('cases/', views.api_cases, name='api_cases'),

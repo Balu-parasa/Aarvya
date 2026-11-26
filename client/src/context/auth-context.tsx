@@ -20,13 +20,19 @@ interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
   login: (email: string, password?: string, role?: UserRole) => Promise<boolean>;
-  loginWithGoogle: (role?: UserRole) => Promise<boolean>;
+  loginWithGoogle: (role?: UserRole, googleToken?: string, mode?: 'login' | 'register') => Promise<{ success: boolean; notFound?: boolean; error?: string }>;
   register: (email: string, password?: string, name?: string, role?: UserRole) => Promise<boolean>;
   logout: () => void;
   setRole: (role: UserRole) => void;
   updateUser: (fields: Partial<User>) => void;
   setHasCompletedCheckin: (completed: boolean) => void;
 }
+
+// API base configuration supporting local and deployed environments
+const API_BASE =
+  (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_API_URL) ||
+  (typeof process !== 'undefined' && (process.env?.NEXT_PUBLIC_API_URL || process.env?.VITE_API_URL)) ||
+  'http://127.0.0.1:8000/api';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -122,7 +128,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // 1. Attempt Django REST Framework authentication
     try {
-      const res = await fetch('http://127.0.0.1:8000/api/auth/login/', {
+      const res = await fetch(`${API_BASE}/auth/login/`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: cleanEmail, password }),
@@ -178,19 +184,53 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return true;
   };
 
-  const loginWithGoogle = async (role: UserRole = 'counsellor'): Promise<boolean> => {
-    const googleUser: User = {
-      id: 'usr_google_123',
-      name: 'Balu Parasa',
-      email: 'baluparasa239@gmail.com',
-      role,
-      hasCompletedCheckin: true,
-    };
-    setUser(googleUser);
+  const loginWithGoogle = async (
+    role: UserRole = 'counsellor',
+    googleToken?: string,
+    mode: 'login' | 'register' = 'login'
+  ): Promise<{ success: boolean; notFound?: boolean; error?: string }> => {
+    if (!googleToken) {
+      return { success: false, error: 'Google authentication was cancelled or token is missing.' };
+    }
+
     try {
-      localStorage.setItem('aarvya_user', JSON.stringify(googleUser));
-    } catch {}
-    return true;
+      const res = await fetch(`${API_BASE}/auth/google/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: googleToken, role, mode }),
+      });
+
+      const data = await res.json();
+
+      if (res.status === 404 && data.not_found) {
+        return { success: false, notFound: true, error: data.error };
+      }
+
+      if (res.ok && data.user) {
+        const apiUser: User = {
+          id: String(data.user.id),
+          name: data.user.name || data.user.username,
+          email: data.user.email,
+          role: (data.user.role as UserRole) || role,
+          case_id: data.user.case_id,
+          hasCompletedCheckin: data.user.has_completed_checkin ?? true,
+          distressScore: data.user.distress_score ?? 52,
+          nextCheckinTime: data.user.next_checkin_time ?? 'Tomorrow, 10:30 AM',
+        };
+        setUser(apiUser);
+        try {
+          localStorage.setItem('aarvya_user', JSON.stringify(apiUser));
+          if (data.token) {
+            localStorage.setItem('aarvya_token', data.token);
+          }
+        } catch {}
+        return { success: true };
+      }
+
+      return { success: false, error: data.error || 'Authentication failed' };
+    } catch (err: any) {
+      return { success: false, error: 'Cannot connect to authentication server. Please check your network or server.' };
+    }
   };
 
   const register = async (email: string, password?: string, name?: string, role: UserRole = 'victim'): Promise<boolean> => {
@@ -198,7 +238,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // Attempt Django REST Framework registration
     try {
-      const res = await fetch('http://127.0.0.1:8000/api/auth/register/', {
+      const res = await fetch(`${API_BASE}/auth/register/`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: cleanEmail, password, name, role }),

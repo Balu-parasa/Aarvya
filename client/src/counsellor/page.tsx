@@ -199,7 +199,7 @@ export default function CounsellorPage() {
   const highFollowUpsCount = cases.filter((c) => c.score >= 60).length;
 
   return (
-    <AuthGuard>
+    <AuthGuard allowedRoles={['counsellor', 'admin']}>
       <div className="flex min-h-screen bg-[#F8FAFC] text-[#142334] font-sans">
         {/* Sidebar Navigation */}
         <Sidebar currentView={activeView} onViewChange={(v) => setActiveView(v)} />

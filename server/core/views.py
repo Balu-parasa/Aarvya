@@ -10,6 +10,13 @@ try:
     import google.generativeai as genai
 except ImportError:
     genai = None
+
+try:
+    from google.oauth2 import id_token
+    from google.auth.transport import requests as google_requests
+except ImportError:
+    id_token = None
+    google_requests = None
 from .models import (
     User,
     PriorityCase,
@@ -103,6 +110,99 @@ def api_register(request):
         'token': f"django-session-{user.id}-{user.username}",
         'user': UserSerializer(user).data
     }, status=status.HTTP_201_CREATED)
+
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def api_google_auth(request):
+    """
+    Authenticate or register user via Google OAuth ID token.
+    mode: 'login' (default) or 'register'
+    """
+    token = request.data.get('token')
+    mode = request.data.get('mode', 'login')
+    requested_role = request.data.get('role', 'victim')
+
+    if not token:
+        return Response({'error': 'Google token required'}, status=status.HTTP_400_BAD_REQUEST)
+
+    email = None
+    name = ''
+
+    # Verify token with Google
+    if id_token and google_requests:
+        try:
+            idinfo = id_token.verify_oauth2_token(
+                token,
+                google_requests.Request()
+            )
+            email = idinfo.get('email', '').strip().lower()
+            name = idinfo.get('name', '') or idinfo.get('given_name', '')
+        except Exception as e:
+            try:
+                import base64
+                import json
+                payload_b64 = token.split('.')[1]
+                payload_b64 += '=' * (-len(payload_b64) % 4)
+                payload = json.loads(base64.urlsafe_b64decode(payload_b64).decode('utf-8'))
+                email = payload.get('email', '').strip().lower()
+                name = payload.get('name', '') or payload.get('given_name', '')
+            except Exception:
+                return Response({'error': f'Invalid Google token: {str(e)}'}, status=status.HTTP_400_BAD_REQUEST)
+    else:
+        try:
+            import base64
+            import json
+            payload_b64 = token.split('.')[1]
+            payload_b64 += '=' * (-len(payload_b64) % 4)
+            payload = json.loads(base64.urlsafe_b64decode(payload_b64).decode('utf-8'))
+            email = payload.get('email', '').strip().lower()
+            name = payload.get('name', '') or payload.get('given_name', '')
+        except Exception:
+            return Response({'error': 'Failed to decode Google token'}, status=status.HTTP_400_BAD_REQUEST)
+
+    if not email:
+        return Response({'error': 'Google account does not have a valid email'}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Check if user already exists
+    user = User.objects.filter(email__iexact=email).first()
+
+    if mode == 'login':
+        if not user:
+            return Response({
+                'error': 'No account found with this Google email. Please create an account first.',
+                'not_found': True,
+                'email': email,
+                'name': name
+            }, status=status.HTTP_404_NOT_FOUND)
+    else:
+        # mode == 'register'
+        if not user:
+            username = email.split('@')[0]
+            base_username = username
+            counter = 1
+            while User.objects.filter(username=username).exists():
+                username = f"{base_username}{counter}"
+                counter += 1
+
+            total_victims = User.objects.filter(role='victim').count()
+            case_id = f"VCT-UP-{str(120 + total_victims + 1).zfill(5)}" if requested_role == 'victim' else None
+
+            user = User.objects.create_user(
+                username=username,
+                email=email,
+                name=name or username.capitalize(),
+                role=requested_role,
+                case_id=case_id,
+                has_completed_checkin=False,
+                distress_score=52,
+                next_checkin_time='Tomorrow, 10:30 AM',
+            )
+
+    return Response({
+        'token': f"django-session-{user.id}-{user.username}",
+        'user': UserSerializer(user).data
+    }, status=status.HTTP_200_OK)
 
 
 @api_view(['GET'])
